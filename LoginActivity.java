@@ -1,156 +1,226 @@
-package sample.kcs.com.mediamonitoring.activity;
 
+package co.example.dell.callcontrol;
+
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.databinding.DataBindingUtil;
+import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+import android.support.design.widget.TextInputLayout;
 import android.text.TextUtils;
+import android.util.Log;
+import android.util.Patterns;
 import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.Toast;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.json.JSONException;
+import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.lang.annotation.Annotation;
-
-import okhttp3.ResponseBody;
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Converter;
-import retrofit2.Response;
-import sample.kcs.com.mediamonitoring.R;
-import sample.kcs.com.mediamonitoring.databinding.ActivityLoginBinding;
-import sample.kcs.com.mediamonitoring.interfaces.APIService;
-import sample.kcs.com.mediamonitoring.model.ApiUtils;
-import sample.kcs.com.mediamonitoring.model.MConstant;
-import sample.kcs.com.mediamonitoring.model.ModelLoginRequest;
-import sample.kcs.com.mediamonitoring.model.ModelLoginResponse;
-import sample.kcs.com.mediamonitoring.model.RetrofitClient;
+import java.util.ArrayList;
 
 /**
- * Created by Dell on 11-04-2017.
+ * Created by Dell on 11-01-2017.
  */
 
-public class LoginActivity extends AppCompatActivity implements View.OnClickListener{
-
-    ActivityLoginBinding mBindind;
-
-    String deviceType;
-    public static final String SPRELOGINTOKEN="spreflogintoken";
-    public static final String SPREMEMBERID="sprememberid";
-    public static final String KEYLOGINTOKEN="logintoken";
-    public static final String KEYMEMBERID="memberid";
-
-
-
-
+public class LoginActivity extends BaseActivity implements Constants{
+    private Button btnLogin;
+    Context con=this;
+    private TextInputLayout tilEmail;
+    private EditText edtemail;
+    private String email;
+    ArrayList<String> a=new ArrayList<>();
 
     @Override
-    protected void onCreate( Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mBindind= DataBindingUtil.setContentView(LoginActivity.this, R.layout.activity_login);
-        mBindind.loginBtnLogin.setOnClickListener(this);
+        setContentView(R.layout.login_activity);
+
+        prepareViews();
+        setListeners();
+        initComponents();
+    }
+
+    // Making HTTP Request
+
+    public  void initComponents(){
 
     }
 
-    @Override
-    public void onClick(View v) {
-        if(v==mBindind.loginBtnLogin){
-             deviceType="A";
+    public void prepareViews() {
 
-            ModelLoginRequest login=new ModelLoginRequest(deviceType,
-                    mBindind.loginEdtMno.getText().toString().trim(),
-                    mBindind.loginEdtName.getText().toString().trim());
-
-                    sendNetworkRequest(login);
-
-        }
+        tilEmail = (TextInputLayout) findViewById(R.id.tilEmail);
+        btnLogin = (Button) findViewById(R.id.btnLogin);
+        edtemail=(EditText) findViewById(R.id.edtemail);
 
     }
 
-    private void sendNetworkRequest(ModelLoginRequest login) {
+    public void setListeners() {
 
-        APIService  mApiService = ApiUtils.getAPIService();
+        btnLogin.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
 
-        if (!TextUtils.isEmpty(mBindind.loginEdtMno.getText()) && !TextUtils.isEmpty(mBindind.loginEdtName.getText()) && !TextUtils.isEmpty(deviceType)) {
-            String jsonData = new Gson().toJson(login);
-            Call<ModelLoginResponse> call= mApiService.createLogin(jsonData);
+                if (!isValidate()) {
 
+                    return;
+                }
 
-                    call.enqueue(new Callback<ModelLoginResponse>() {
-                        @Override
-                        public void onResponse(Call<ModelLoginResponse> call, Response<ModelLoginResponse> response) {
-                            ModelLoginResponse resultModel = getResponse(response, ModelLoginResponse.class);
-                            if(response.isSuccessful()){
+                email=edtemail.getText().toString().trim();
+                startAsync();
 
-                                Toast.makeText(getApplication(),"Record Submitted"+ resultModel.getResult().getLoginToken(),Toast.LENGTH_LONG).show();
-                                String otp=Integer.toString(resultModel.getResult().getOtp());
-                                String strlogintoken=resultModel.getResult().getLoginToken();
-                                String strmemberId=resultModel.getResult().getMemberId();
+               /* new Thread(new Runnable() {
+                    @Override
+                    public void run() {
 
-                                SharedPreferences sploginToken=getSharedPreferences(SPRELOGINTOKEN,Context.MODE_PRIVATE);
-                                SharedPreferences.Editor edtLoginToken=sploginToken.edit();
-                                edtLoginToken.putString(KEYLOGINTOKEN,strlogintoken);
-                                edtLoginToken.commit();
+                        doWebCall();
 
-                                SharedPreferences spMemberId=getSharedPreferences(SPREMEMBERID,Context.MODE_PRIVATE);
-                                SharedPreferences.Editor edtMemberId=spMemberId.edit();
-                                edtMemberId.putString(KEYMEMBERID,strmemberId);
-                                edtMemberId.commit();
+                    }
+
+                }).start();*/
 
 
-                                Intent otpIntent=new Intent(LoginActivity.this,OtpActivity.class);
-                                otpIntent.putExtra(MConstant.OTP,otp);
-                                startActivity(otpIntent);
-                            }
-                            else {
-                                Toast.makeText(getApplicationContext(),"problem ouccur",Toast.LENGTH_LONG).show();
-                            }
 
 
-                        }
-
-                        @Override
-                        public void onFailure(Call<ModelLoginResponse> call, Throwable t) {
-                            Toast.makeText(getApplicationContext(),"something wrong done",Toast.LENGTH_LONG).show();
-                        }
-                    });
-        }
-    }
-
-    public static <T> T getResponse(Response<T> tResponse, Class<T> tClass) {
-        if (tResponse.code() > 199 && tResponse.code() < 300) {
-            T t = tResponse.body();
-
-            if (t == null) {
-                t = new GsonBuilder().create().fromJson(createErrorMsgJson(), tClass);
             }
-            return t;
+        });
+
+
+
+    }
+
+
+    public boolean isValidate() {
+
+        boolean isValid = true;
+
+        if (TextUtils.isEmpty(tilEmail.getEditText().getText().toString().trim())) {
+
+            isValid = false;
+            tilEmail.setError(tilEmail.getHint() + " " + getString(R.string.error_empty));
         } else {
-            Converter<ResponseBody, T> errorConverter =
-                    RetrofitClient.getClient("http://180.211.99.238:8092/khushi_sta_qc/api/").responseBodyConverter(tClass, (java.lang.annotation.Annotation[]) new Annotation[0]);
+
+            if (!Patterns.EMAIL_ADDRESS.matcher(tilEmail.getEditText().getText().toString().trim()).matches()) {
+
+                isValid = false;
+                tilEmail.setError(getString(R.string.error_invalid) + " " + tilEmail.getHint());
+            }
+        }
+
+        return isValid;
+    }
+
+
+    public void startAsync() {
+
+        new DownloadImageTask().execute(DOMAIN_NAME);
+    }
+
+     class DownloadImageTask extends AsyncTask<String, Void, String> {
+
+         String responseString=null;
+         ProgressDialog pd;
+
+         @Override
+         protected void onPreExecute() {
+             // TODO Auto-generated method stub
+             super.onPreExecute();
+             pd = new ProgressDialog(con);
+             pd.setTitle("Loading");
+             pd.setMessage("Please Wait");
+             pd.show();
+         }
+        /** The system calls this to perform work in a worker thread and
+         * delivers it the parameters given to AsyncTask.execute() */
+        protected String doInBackground(String... urls) {
+            HttpClient hc = new DefaultHttpClient();
+            String message;
+
+            HttpPost httpPost = new HttpPost(urls[0]);
+            JSONObject object = new JSONObject();
+            try {
+//            {"method":"login_request_otp","params":{"email":"kpchetnani29@gmail.com"}}
+                //{"method":"login_verify_otp","params":{"email":"kpchetnani29@gmail.com","code":5220}}
+
+                object.put("method", "login_request_otp");
+                JSONObject jsonObject = new JSONObject();
+                jsonObject.put("email",email);
+                //jsonObject.put("code",321);
+                object.put("params", jsonObject);
+
+
+            } catch (Exception ex) {
+
+                ex.printStackTrace();
+            }
 
             try {
-                return errorConverter.convert(tResponse.errorBody());
-            } catch (IOException e) {
-                e.printStackTrace();
-                return new GsonBuilder().create().fromJson(createErrorMsgJson(), tClass);
+                message = object.toString();
+                httpPost.setEntity(new StringEntity(message, "UTF8"));
+                httpPost.setHeader("Content-type", "application/json");
+                HttpResponse resp = null;
+                try {
+                    resp = hc.execute(httpPost);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                try {
+                    resp.getEntity().writeTo(out);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                 responseString = out.toString();
+
+
+                Log.d("result", responseString);
+
+            } catch (Exception e) {
+
             }
+
+            return responseString;
+
         }
 
+        /** The system calls this to perform work in the UI thread and delivers
+         * the result from doInBackground() */
+        protected void onPostExecute(String responseString) {
+            pd.dismiss();
+             JSONObject response= null;
+             try {
+                 response = new JSONObject(responseString);
+             } catch (JSONException e) {
+                 e.printStackTrace();
+             }
+             try {
+                 if(response.getInt("error")==0){
+
+                    // showMessage("OTP successful",Toast.LENGTH_SHORT);
+                     email=edtemail.getText().toString().trim();
+                     Toast.makeText(getApplicationContext(),"Otp Send on your email",Toast.LENGTH_SHORT).show();
+                     Intent loginIntent = new Intent(LoginActivity.this, OtpActivityVolly.class);
+                     loginIntent.putExtra("key",email);
+                     startActivity(loginIntent);
+
+
+                 }else{
+
+                     showMessage(response.getString("message"),Toast.LENGTH_SHORT);
+                 }
+             } catch (JSONException e) {
+                 e.printStackTrace();
+             }
+
+         }
+
     }
-    // dummy error message
-    private static String createErrorMsgJson() {
-
-        return "{\n" +
-                "\"Status\": true,\n" +
-                "\"StatusCode\": 0,\n" +
-                "\"Message\": \"Due to network connection error we\\'re having trouble\"\n" +
-                "}";
-    }
-
-
 }
